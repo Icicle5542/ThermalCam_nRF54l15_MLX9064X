@@ -13,8 +13,8 @@ A Zephyr RTOS application that reads frames from an MLX90640 32×24 thermal came
 | Sensor I2C address | `0x33` (factory default) |
 | Sensor supply voltage | **3.3 V** |
 
-> **Important — DK voltage configuration:** The MLX90640 module requires a **3.3 V** supply. The nRF54L15 DK's GPIO header voltage must be set accordingly before powering the sensor.
-> Open **nRF Connect for Desktop → Board Configurator**, select your DK, and set **VDD (nPM VOUT1)** to **3.3 V**. Flash the Board Configurator firmware to the DK to apply the setting.
+> **Important — DK voltage configuration:** The MLX90640 module requires a **3.3 V** supply. The nRF54L15 DK's GPIO header voltage must be set accordingly before powering the sensor. By default the DK is shipped with a VDD rail setting of 1.8V, so you'll need to do the follwing change to supply the camera module properly!
+> Open **nRF Connect for Desktop → Board Configurator**, select your DK, and set **VDD (nPM VOUT1)** to **3.3 V**. Configure your board by clicking "Write config". Please note that this changes the VDD rail of all GPIO ports, just in case you have other HW connected to it make sure that it is 3.3V compliant.
 
 ---
 
