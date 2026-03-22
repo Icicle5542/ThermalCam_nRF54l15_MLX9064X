@@ -1,0 +1,49 @@
+/* Device tree overlay for ThermalCam on nRF54L15 DK (Nordic Semiconductor).
+ *
+ * Enables the I2C21 (TWIM1) peripheral on:
+ *   SCL = P1.11
+ *   SDA = P1.12
+ *
+ * Pin selection rationale (nRF54L15 DK):
+ *   P0.0-P0.3  = UART30 (second UART)
+ *   P0.4       = button3 / GRTC
+ *   P1.4-P1.7  = UART20 (console)
+ *   P1.8       = button2 / GRTC clkout
+ *   P1.9       = button1
+ *   P1.10      = LED1 / PWM20
+ *   P1.13      = button0
+ *   P1.14      = LED3
+ *   P2.1/2/4   = SPI00 (NOR flash)
+ *   P2.5       = SPI CS
+ *   P2.7/2.9   = LEDs
+ *   P1.2/P1.3  = ETM trace (TRACEDATA[2:3]) — require PCB modification
+ *   P1.11/P1.12 = free general-purpose header pins, no board hardware attached
+ *
+ * The MLX90640 sensor is wired to these pins at I2C address 0x33.
+ */
+
+&pinctrl {
+	i2c21_default: i2c21_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SCL, 1, 11)>,
+			        <NRF_PSEL(TWIM_SDA, 1, 12)>;
+			bias-pull-up;
+		};
+	};
+
+	i2c21_sleep: i2c21_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SCL, 1, 11)>,
+			        <NRF_PSEL(TWIM_SDA, 1, 12)>;
+			low-power-enable;
+		};
+	};
+};
+
+&i2c21 {
+	status = "okay";
+	pinctrl-0 = <&i2c21_default>;
+	pinctrl-1 = <&i2c21_sleep>;
+	pinctrl-names = "default", "sleep";
+	clock-frequency = <400000>;
+};
