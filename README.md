@@ -102,3 +102,85 @@ The application prints a statistics header followed by a 24-row ASCII heat map e
 | `o` | Warm |
 | `#` | Hot |
 | `@` | Very hot |
+
+---
+
+## BLE Interface
+
+In addition to the UART/RTT log output, the firmware continuously streams live thermal frames over **Bluetooth LE** using the **Nordic UART Service (NUS)**. This allows a PC or phone to receive and display the thermal image in real time.
+
+### BLE configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Role | Peripheral (advertises as `"ThermalCam"`) |
+| Service | Nordic UART Service (NUS) |
+| NUS TX characteristic UUID | `6e400003-b5a3-f393-e0a9-e50e24dcca9e` |
+| LL data length | 251 bytes (DLE enabled) |
+| ATT MTU | 247 bytes |
+| Frame rate | One frame every 5 seconds (see `MLX90640_READ_INTERVAL_S`) |
+
+### Wire protocol
+
+Each frame is a fixed **776-byte** packet transmitted as a series of NUS TX notifications. All multi-byte integers are **big-endian**.
+
+| Offset | Size | Type | Content |
+|--------|------|------|---------|
+| 0 | 2 | `uint8[2]` | Start-of-frame marker: `0xFF 0xFE` |
+| 2 | 2 | `int16` | `t_min × 10` — coldest pixel temperature × 10 (e.g. `227` = 22.7 °C) |
+| 4 | 2 | `int16` | `t_max × 10` — hottest pixel temperature × 10 |
+| 6 | 768 | `uint8[768]` | Pixels in row-major order (24 rows × 32 cols). `0` = coldest, `255` = hottest. |
+| 774 | 2 | `uint8[2]` | End-of-frame marker: `0xFF 0xFD` |
+
+The pixel values are linearly scaled between `t_min` and `t_max` within each frame, so the full 0–255 range is always used regardless of absolute temperature.
+
+---
+
+## Live Viewer — `thermal_viewer.py`
+
+`thermal_viewer.py` is a Python script that connects to the device over BLE and displays the thermal image in a real-time matplotlib window.
+
+### Requirements
+
+- **Python 3.9+**
+- Packages: `bleak`, `numpy`, `matplotlib >= 3.9`
+
+### Setup
+
+Create a virtual environment and install the dependencies (run once):
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1          # PowerShell
+# or: .venv\Scripts\activate.bat   # cmd.exe
+
+pip install "bleak" "numpy" "matplotlib>=3.9"
+```
+
+> **Note — PowerShell execution policy:** If `Activate.ps1` is blocked, run once:
+> ```powershell
+> Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+> ```
+
+### Running
+
+1. Power the nRF54L15 DK and make sure the firmware is running (the UART log should show `Advertising as "ThermalCam"`).
+2. Activate the virtual environment (if not already active):
+   ```powershell
+   .venv\Scripts\Activate.ps1
+   ```
+3. Run the viewer:
+   ```powershell
+   python thermal_viewer.py
+   ```
+
+The script will scan for a BLE device named `ThermalCam`, connect automatically, start receiving notifications, and open a live colour-mapped plot window (inferno colour map, cold = dark, hot = bright). The title bar of the plot updates with the current min / max / span temperatures for each received frame.
+
+Close the plot window to disconnect and exit.
+
+![Thermal Viewer sample screenshot](imgs/thermal_viewer_sample.png)
+
+### Architecture note
+
+The BLE stack (bleak / asyncio) runs in a **background thread**; the matplotlib GUI runs on the **main thread**. This prevents the GUI event loop from starving the asyncio event loop, which is a common pitfall on Windows.
+

@@ -11,4 +11,5 @@ target_sources(app PRIVATE
   src/main.c
   src/mlx90640_api.c
   src/mlx90640_i2c.c
+  src/ble_stream.c
 )

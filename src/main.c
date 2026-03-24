@@ -15,6 +15,7 @@
 
 #include "mlx90640_api.h"
 #include "mlx90640_i2c.h"
+#include "ble_stream.h"
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
@@ -224,6 +225,7 @@ static void thermal_thread_fn(void *p1, void *p2, void *p3)
 
         if (ret == 0) {
             mlx90640_display_ascii();
+            ble_stream_send_frame(s_temp_image, MLX90640_PIXELS);
         } else {
             LOG_ERR("Image read failed (err %d) — retrying in %d s",
                     ret, MLX90640_READ_INTERVAL_S);
@@ -240,7 +242,12 @@ int main(void)
 {
     LOG_INF("ThermalCam starting (nRF54L15 + MLX90640)");
 
-    int ret = mlx90640_configure();
+    int ret = ble_stream_init();
+    if (ret != 0) {
+        LOG_ERR("BLE init failed (err %d) — continuing without BLE", ret);
+    }
+
+    ret = mlx90640_configure();
     if (ret != 0) {
         LOG_ERR("Sensor configuration failed (err %d) — halting", ret);
         return ret;
