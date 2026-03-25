@@ -27,6 +27,10 @@ static struct bt_conn *s_conn;          /* NULL when not connected */
 static bool           s_notify_enabled; /* true once peer writes CCCD = 1 */
 static K_SEM_DEFINE(s_bt_ready, 0, 1); /* signalled by bt_ready_cb */
 
+/* Work item to restart advertising outside the BT RX thread context. */
+static void adv_restart_work_handler(struct k_work *work);
+static K_WORK_DEFINE(s_adv_restart_work, adv_restart_work_handler);
+
 /* ---- Advertising / scan-response data ---------------------------------- */
 
 /*
@@ -60,6 +64,20 @@ static void bt_ready_cb(int err)
     k_sem_give(&s_bt_ready);
 }
 
+/* ---- Advertising restart (runs on system workqueue) -------------------- */
+
+static void adv_restart_work_handler(struct k_work *work)
+{
+    int ret = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1,
+                              s_adv, ARRAY_SIZE(s_adv),
+                              s_sd,  ARRAY_SIZE(s_sd));
+    if (ret) {
+        LOG_ERR("Advertising restart failed (err %d)", ret);
+    } else {
+        LOG_INF("Re-advertising as \"%s\"", CONFIG_BT_DEVICE_NAME);
+    }
+}
+
 /* ---- Connection event callbacks ---------------------------------------- */
 
 static void connected_cb(struct bt_conn *conn, uint8_t err)
@@ -90,15 +108,10 @@ static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
         s_conn = NULL;
     }
 
-    /* Restart advertising so the PC can reconnect. */
-    int ret = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1,
-                              s_adv, ARRAY_SIZE(s_adv),
-                              s_sd,  ARRAY_SIZE(s_sd));
-    if (ret) {
-        LOG_ERR("Advertising restart failed (err %d)", ret);
-    } else {
-        LOG_INF("Re-advertising as \"%s\"", CONFIG_BT_DEVICE_NAME);
-    }
+    /* Defer advertising restart to the system workqueue so it runs
+     * outside the BT RX thread context (avoids a silent failure on
+     * some nRF Connect SDK versions). */
+    k_work_submit(&s_adv_restart_work);
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
