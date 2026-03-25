@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #define MLX90640_ADDR           0x33    /* Default 7-bit I2C address */
 #define MLX90640_EMISSIVITY     0.95f   /* Typical for most surfaces */
 #define MLX90640_TA_SHIFT       8.0f    /* °C shift applied to Ta for TR */
-#define MLX90640_REFRESH_RATE   0x05    /* 16 Hz (register value) */
+#define MLX90640_REFRESH_RATE   0x03    /* 4 Hz (register value) */
 #define MLX90640_READ_INTERVAL_S 5      /* Seconds between frame captures */
 
 /* ---- Image geometry ---- */
@@ -103,7 +103,7 @@ static int mlx90640_configure(void)
         LOG_ERR("Failed to set refresh rate (err %d)", ret);
         return ret;
     }
-    LOG_INF("MLX90640 configured: 16 Hz refresh, emissivity=0.95");
+    LOG_INF("MLX90640 configured: 4 Hz refresh, emissivity=0.95");
 
     return 0;
 }
@@ -117,12 +117,29 @@ static int mlx90640_configure(void)
  *
  * Returns 0 on success, negative on I2C or sensor error.
  * ============================================================ */
+#define SUBFRAME_MAX_RETRIES  3
+
 static int mlx90640_read_image(void)
 {
     for (int subframe = 0; subframe < 2; subframe++) {
-        int ret = MLX90640_GetFrameData(MLX90640_ADDR, s_frame_data);
+        int ret = -1;
+
+        for (int attempt = 0; attempt < SUBFRAME_MAX_RETRIES; attempt++) {
+            ret = MLX90640_GetFrameData(MLX90640_ADDR, s_frame_data);
+            if (ret >= 0) {
+                break;  /* success */
+            }
+            LOG_WRN("GetFrameData failed (sub %d, attempt %d, err %d)",
+                    subframe, attempt, ret);
+
+            /* Try to unstick the I2C bus before retrying. */
+            (void)MLX90640_I2CRecover();
+            k_msleep(50);
+        }
+
         if (ret < 0) {
-            LOG_ERR("GetFrameData failed (sub %d, err %d)", subframe, ret);
+            LOG_ERR("GetFrameData failed after %d retries (sub %d, err %d)",
+                    SUBFRAME_MAX_RETRIES, subframe, ret);
             return ret;
         }
 

@@ -89,3 +89,11 @@ int MLX90640_I2CWrite(uint8_t slaveAddr, unsigned int writeAddress, uint16_t dat
 
     return 0;
 }
+
+int MLX90640_I2CRecover(void)
+{
+    if (!s_i2c_dev) {
+        return -ENODEV;
+    }
+    return i2c_recover_bus(s_i2c_dev);
+}

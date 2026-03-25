@@ -38,4 +38,11 @@ int MLX90640_I2CRead(uint8_t slaveAddr, unsigned int startAddress,
  */
 int MLX90640_I2CWrite(uint8_t slaveAddr, unsigned int writeAddress, uint16_t data);
 
+/**
+ * @brief Attempt to recover the I2C bus (toggle SCL to release a stuck SDA).
+ *
+ * @return 0 on success, negative errno on failure.
+ */
+int MLX90640_I2CRecover(void);
+
 #endif /* MLX90640_I2C_H */
