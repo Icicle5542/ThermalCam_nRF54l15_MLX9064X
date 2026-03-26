@@ -11,6 +11,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
 #include "mlx90640_api.h"
@@ -18,6 +19,16 @@
 #include "ble_stream.h"
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+
+/* The devicetree node identifier for the "led0"  and "led1" alias. */
+#define LED0_NODE DT_ALIAS(led0)
+#define LED1_NODE DT_ALIAS(led1)
+#define LED2_NODE DT_ALIAS(led2)
+#define LED3_NODE DT_ALIAS(led3)
+
+/* ---- LED indicators ---- */
+static const struct gpio_dt_spec s_led2 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
+static const struct gpio_dt_spec s_led3 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
 
 /* ---- Sensor settings ---- */
 #define MLX90640_ADDR           0x33    /* Default 7-bit I2C address */
@@ -238,11 +249,15 @@ static void thermal_thread_fn(void *p1, void *p2, void *p3)
     ARG_UNUSED(p3);
 
     while (true) {
+        gpio_pin_set_dt(&s_led2, 1);
         int ret = mlx90640_read_image();
+        gpio_pin_set_dt(&s_led2, 0);
 
         if (ret == 0) {
             mlx90640_display_ascii();
+            gpio_pin_set_dt(&s_led3, 1);
             ble_stream_send_frame(s_temp_image, MLX90640_PIXELS);
+            gpio_pin_set_dt(&s_led3, 0);
         } else {
             LOG_ERR("Image read failed (err %d) — retrying in %d s",
                     ret, MLX90640_READ_INTERVAL_S);
@@ -258,6 +273,14 @@ static void thermal_thread_fn(void *p1, void *p2, void *p3)
 int main(void)
 {
     LOG_INF("ThermalCam starting (nRF54L15 + MLX90640)");
+
+    /* Configure LED2 (capture) and LED3 (BLE TX) as outputs, initially off. */
+    if (gpio_is_ready_dt(&s_led2)) {
+        gpio_pin_configure_dt(&s_led2, GPIO_OUTPUT_INACTIVE);
+    }
+    if (gpio_is_ready_dt(&s_led3)) {
+        gpio_pin_configure_dt(&s_led3, GPIO_OUTPUT_INACTIVE);
+    }
 
     int ret = ble_stream_init();
     if (ret != 0) {

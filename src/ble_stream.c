@@ -7,6 +7,7 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <bluetooth/services/nus.h>
@@ -21,6 +22,9 @@ LOG_MODULE_REGISTER(ble_stream, LOG_LEVEL_INF);
 #define FRAME_COLS    32
 #define FRAME_PIXELS  (FRAME_ROWS * FRAME_COLS)              /* 768  */
 #define FRAME_BUF_SZ  (2 + 2 + 2 + FRAME_PIXELS + 2)        /* 776  */
+
+/* ---- LED0: BLE connected indicator ---- */
+static const struct gpio_dt_spec s_led0 = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 
 /* ---- Module-level state ---- */
 static struct bt_conn *s_conn;          /* NULL when not connected */
@@ -87,6 +91,7 @@ static void connected_cb(struct bt_conn *conn, uint8_t err)
         return;
     }
     s_conn = bt_conn_ref(conn);
+    gpio_pin_set_dt(&s_led0, 1);
     LOG_INF("BLE peer connected");
 }
 
@@ -101,6 +106,7 @@ static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
 {
     LOG_INF("BLE peer disconnected (reason 0x%02x)", reason);
 
+    gpio_pin_set_dt(&s_led0, 0);
     s_notify_enabled = false;
 
     if (s_conn) {
@@ -124,6 +130,11 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
  * ============================================================ */
 int ble_stream_init(void)
 {
+    /* Configure LED0 (BLE connected indicator), initially off. */
+    if (gpio_is_ready_dt(&s_led0)) {
+        gpio_pin_configure_dt(&s_led0, GPIO_OUTPUT_INACTIVE);
+    }
+
     /* Enable the BT controller; bt_ready_cb fires when ready. */
     int ret = bt_enable(bt_ready_cb);
     if (ret) {
