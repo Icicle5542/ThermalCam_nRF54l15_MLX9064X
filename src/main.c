@@ -34,8 +34,8 @@ static const struct gpio_dt_spec s_led3 = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
 #define MLX90640_ADDR           0x33    /* Default 7-bit I2C address */
 #define MLX90640_EMISSIVITY     0.95f   /* Typical for most surfaces */
 #define MLX90640_TA_SHIFT       8.0f    /* °C shift applied to Ta for TR */
-#define MLX90640_REFRESH_RATE   0x03    /* 4 Hz (register value) */
-#define MLX90640_READ_INTERVAL_S 5      /* Seconds between frame captures */
+#define MLX90640_REFRESH_RATE    0x03    /* 4 Hz (register value) */
+#define MLX90640_READ_INTERVAL_MS 500    /* Milliseconds between frame captures (2 fps) */
 
 /* ---- Image geometry ---- */
 #define MLX90640_ROWS    24
@@ -259,11 +259,11 @@ static void thermal_thread_fn(void *p1, void *p2, void *p3)
             ble_stream_send_frame(s_temp_image, MLX90640_PIXELS);
             gpio_pin_set_dt(&s_led3, 0);
         } else {
-            LOG_ERR("Image read failed (err %d) — retrying in %d s",
-                    ret, MLX90640_READ_INTERVAL_S);
+            LOG_ERR("Image read failed (err %d) — retrying in %d ms",
+                    ret, MLX90640_READ_INTERVAL_MS);
         }
 
-        k_sleep(K_SECONDS(MLX90640_READ_INTERVAL_S));
+        k_sleep(K_MSEC(MLX90640_READ_INTERVAL_MS));
     }
 }
 
@@ -300,8 +300,8 @@ int main(void)
 
     k_thread_name_set(&s_thermal_thread, "thermal");
 
-    LOG_INF("Thermal imaging thread started (reads every %d s)",
-            MLX90640_READ_INTERVAL_S);
+    LOG_INF("Thermal imaging thread started (reads every %d ms)",
+            MLX90640_READ_INTERVAL_MS);
 
     return 0;
 }
